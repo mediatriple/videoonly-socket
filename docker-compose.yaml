@@ -1,0 +1,71 @@
+services:
+  repo-sync:
+    image: alpine/git:2.47.2
+    container_name: videoonly-repo-sync
+    restart: unless-stopped
+    environment:
+      GIT_REPO: https://github.com/mediatriple/videoonly-socket.git
+      GIT_BRANCH: main
+      GIT_TOKEN_B64: ${GIT_TOKEN_B64}
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+
+        token="$(printf "%s" "$${GIT_TOKEN_B64}" | base64 -d)"
+        auth_repo="https://x-access-token:$${token}@$${GIT_REPO#https://}"
+
+        if [ ! -d /repo/.git ]; then
+          git clone --depth 1 --branch "$${GIT_BRANCH}" "$${auth_repo}" /repo
+        else
+          git -C /repo remote set-url origin "$${auth_repo}"
+          git -C /repo fetch origin "$${GIT_BRANCH}" --depth 1
+          git -C /repo reset --hard "origin/$${GIT_BRANCH}"
+        fi
+
+        while true; do
+          git -C /repo fetch origin "$${GIT_BRANCH}" --depth 1
+          git -C /repo reset --hard "origin/$${GIT_BRANCH}"
+          sleep 10
+        done
+    volumes:
+      - repo-data:/repo
+
+  app:
+    image: node:20-alpine
+    container_name: videoonly-socket
+    restart: unless-stopped
+    depends_on:
+      - repo-sync
+    working_dir: /repo
+    environment:
+      PORT: "3030"
+      NODE_ENV: development
+      LOG_LEVEL: info
+      TOKEN_SECRET: change-me
+      ALLOWED_ORIGINS: https://mtvosoct1.mediatriple.net,http://localhost
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.videoonly-socket.rule=Host(`mtvosoct1.mediatriple.net`)
+      - traefik.http.routers.videoonly-socket.entrypoints=web
+      - traefik.http.services.videoonly-socket.loadbalancer.server.port=3030
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        while [ ! -f /repo/package.json ]; do
+          echo "Repo hazirlaniyor..."
+          sleep 2
+        done
+        cd /repo
+        npm ci
+        npm run dev
+    ports:
+      - "3030:3030"
+    volumes:
+      - repo-data:/repo
+
+volumes:
+  repo-data:

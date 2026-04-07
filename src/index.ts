@@ -17,17 +17,36 @@ const ALLOWED_ORIGINS = (
 // ── HTTP server ──────────────────────────────────────────────────────────────
 
 const httpServer = http.createServer((req, res) => {
-  if (req.method === 'GET' && req.url === '/health') {
-    const body = JSON.stringify({ status: 'ok', uptime: process.uptime() });
-    res.writeHead(200, {
+  const requestPath = (req.url ?? '/').split('?')[0];
+
+  const sendJson = (statusCode: number, payload: Record<string, unknown>) => {
+    const body = JSON.stringify(payload);
+    res.writeHead(statusCode, {
       'Content-Type': 'application/json',
       'Content-Length': Buffer.byteLength(body),
     });
     res.end(body);
+  };
+
+  if (req.method === 'GET' && requestPath === '/health') {
+    sendJson(200, { status: 'ok', uptime: process.uptime() });
     return;
   }
 
-  res.writeHead(404).end();
+  if (req.method === 'GET' && requestPath === '/') {
+    sendJson(200, {
+      service: 'panelsocket',
+      status: 'ok',
+      health: '/health',
+      socket_path: '/socket.io',
+    });
+    return;
+  }
+
+  sendJson(404, {
+    error: 'not_found',
+    message: 'Use /health for health checks or /socket.io for realtime connections.',
+  });
 });
 
 // ── Socket.IO server ─────────────────────────────────────────────────────────
