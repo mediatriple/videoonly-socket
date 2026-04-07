@@ -8,6 +8,18 @@ import { registerHandlers as registerSoundHandlers } from './handlers/sound';
 import { registerHandlers as registerEncoderHandlers } from './handlers/encoder';
 
 const PORT = parseInt(process.env.PORT ?? '3030', 10);
+const SOCKET_PING_INTERVAL = parseInt(
+  process.env.SOCKET_PING_INTERVAL ?? '25000',
+  10,
+);
+const SOCKET_PING_TIMEOUT = parseInt(
+  process.env.SOCKET_PING_TIMEOUT ?? '60000',
+  10,
+);
+const SOCKET_UPGRADE_TIMEOUT = parseInt(
+  process.env.SOCKET_UPGRADE_TIMEOUT ?? '30000',
+  10,
+);
 const ALLOWED_ORIGINS = (
   process.env.ALLOWED_ORIGINS ?? 'https://panel.mediatriple.net,http://localhost'
 )
@@ -56,6 +68,10 @@ export const io = new Server(httpServer, {
     origin: ALLOWED_ORIGINS,
     methods: ['GET', 'POST'],
   },
+  allowEIO3: true,
+  pingInterval: SOCKET_PING_INTERVAL,
+  pingTimeout: SOCKET_PING_TIMEOUT,
+  upgradeTimeout: SOCKET_UPGRADE_TIMEOUT,
   // Allow both polling and WebSocket transports so clients can upgrade.
   transports: ['polling', 'websocket'],
 });
@@ -104,7 +120,10 @@ io.on('connection', (socket) => {
 });
 
 io.engine.on('connection_error', (err) => {
-  logger.error({ event: 'connect_error', message: err.message }, 'Connection error');
+  logger.error(
+    { event: 'connect_error', code: err.code, message: err.message },
+    'Connection error',
+  );
 });
 
 // ── Graceful shutdown ────────────────────────────────────────────────────────
@@ -129,5 +148,14 @@ process.on('SIGINT', shutdown);
 // ── Start ────────────────────────────────────────────────────────────────────
 
 httpServer.listen(PORT, () => {
-  logger.info({ port: PORT, origins: ALLOWED_ORIGINS }, 'panelsocket listening');
+  logger.info(
+    {
+      port: PORT,
+      origins: ALLOWED_ORIGINS,
+      ping_interval: SOCKET_PING_INTERVAL,
+      ping_timeout: SOCKET_PING_TIMEOUT,
+      upgrade_timeout: SOCKET_UPGRADE_TIMEOUT,
+    },
+    'panelsocket listening',
+  );
 });
