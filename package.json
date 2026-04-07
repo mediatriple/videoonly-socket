@@ -1,0 +1,36 @@
+{
+  "name": "panelsocket",
+  "version": "1.0.0",
+  "description": "Socket.IO real-time backend for video encoder management panel",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "test": "jest --runInBand --forceExit",
+    "test:coverage": "jest --runInBand --forceExit --coverage",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "jsonwebtoken": "^9.0.2",
+    "pino": "^9.2.0",
+    "socket.io": "^4.7.5"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/node": "^20.14.2",
+    "jest": "^29.7.0",
+    "socket.io-client": "^4.7.5",
+    "ts-jest": "^29.1.4",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.4.5"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "testMatch": ["**/__tests__/**/*.test.ts"],
+    "testTimeout": 15000
+  }
+}
