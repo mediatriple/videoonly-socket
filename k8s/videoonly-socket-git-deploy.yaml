@@ -1,0 +1,177 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: videoonly-socket
+  namespace: videoonly
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: videoonly-socket
+  template:
+    metadata:
+      labels:
+        app: videoonly-socket
+    spec:
+      volumes:
+        - name: repo
+          emptyDir: {}
+      containers:
+        - name: repo-sync
+          image: alpine/git:2.47.2
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: GIT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: git-token
+                  key: token
+            - name: GIT_REPO
+              value: https://github.com/mediatriple/videoonly-socket.git
+            - name: GIT_BRANCH
+              value: main
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              auth_b64="$(printf 'x-access-token:%s' "${GIT_TOKEN}" | base64 | tr -d '\n')"
+              auth_header="Authorization: Basic ${auth_b64}"
+
+              if [ ! -d /repo/.git ]; then
+                git -c http.extraheader="${auth_header}" clone --depth 1 --branch "${GIT_BRANCH}" "${GIT_REPO}" /repo
+              else
+                git -C /repo remote set-url origin "${GIT_REPO}"
+                git -C /repo -c http.extraheader="${auth_header}" fetch origin "${GIT_BRANCH}" --depth 1
+                git -C /repo reset --hard "origin/${GIT_BRANCH}"
+              fi
+
+              while true; do
+                git -C /repo -c http.extraheader="${auth_header}" fetch origin "${GIT_BRANCH}" --depth 1
+                git -C /repo reset --hard "origin/${GIT_BRANCH}"
+                sleep 10
+              done
+          volumeMounts:
+            - name: repo
+              mountPath: /repo
+
+        - name: app
+          image: node:20-alpine
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PORT
+              value: "3030"
+            - name: NODE_ENV
+              value: development
+            - name: LOG_LEVEL
+              value: info
+            - name: TOKEN_SECRET
+              value: change-me
+            - name: ALLOWED_ORIGINS
+              value: https://mtvosoct1.mediatriple.net,http://localhost
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              while [ ! -f /repo/package.json ]; do
+                echo "Repository hazirlaniyor..."
+                sleep 2
+              done
+
+              cd /repo
+
+              lock_hash() {
+                if [ -f package-lock.json ]; then
+                  sha256sum package-lock.json | awk '{print $1}'
+                else
+                  echo none
+                fi
+              }
+
+              npm ci
+              current_hash="$(lock_hash)"
+              npm run dev &
+              app_pid="$!"
+
+              trap 'kill "${app_pid}" 2>/dev/null || true; exit 0' TERM INT
+
+              while true; do
+                sleep 10
+                new_hash="$(lock_hash)"
+
+                if [ "${new_hash}" != "${current_hash}" ]; then
+                  echo "package-lock degisti, npm ci ve restart calisiyor..."
+                  kill "${app_pid}" 2>/dev/null || true
+                  wait "${app_pid}" 2>/dev/null || true
+                  npm ci
+                  npm run dev &
+                  app_pid="$!"
+                  current_hash="${new_hash}"
+                fi
+
+                if ! kill -0 "${app_pid}" 2>/dev/null; then
+                  echo "Uygulama kapandi, yeniden baslatiliyor..."
+                  npm run dev &
+                  app_pid="$!"
+                fi
+              done
+          ports:
+            - name: http
+              containerPort: 3030
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3030
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3030
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          volumeMounts:
+            - name: repo
+              mountPath: /repo
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: videoonly-socket
+  namespace: videoonly
+spec:
+  selector:
+    app: videoonly-socket
+  ports:
+    - name: http
+      port: 3030
+      targetPort: 3030
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: videoonly-socket
+  namespace: videoonly
+  annotations:
+    acme.cert-manager.io/http01-edit-in-place: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - mtvosoct1.mediatriple.net
+      secretName: videoonly-socket-mtvosoct1-tls
+  rules:
+    - host: mtvosoct1.mediatriple.net
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: videoonly-socket
+                port:
+                  number: 3030
