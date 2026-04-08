@@ -64,6 +64,7 @@ export const io = new Server(httpServer, {
   cors: {
     origin: ALLOWED_ORIGINS,
     methods: ['GET', 'POST'],
+    credentials: true,
   },
   allowEIO3: true,
   pingInterval: SOCKET_PING_INTERVAL,
