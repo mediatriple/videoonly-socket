@@ -46,7 +46,8 @@ services:
       SOCKET_PING_INTERVAL: "25000"
       SOCKET_PING_TIMEOUT: "60000"
       SOCKET_UPGRADE_TIMEOUT: "30000"
-      TOKEN_SECRET: change-me
+      TOKEN_SECRET: bimvid-wihHav-5mybse
+      LEGACY_HMAC_SECRET: yQZBke4F5NXKVHJYpfcU8A
       ALLOWED_ORIGINS: https://panel.mediatriple.net,https://vopanelpp.mediatriple.net,https://mtvosoct1.mediatriple.net,http://localhost
     labels:
       - traefik.enable=true

@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { createServer } from 'http';
+import { createHmac } from 'crypto';
 import { Server } from 'socket.io';
 import { io as clientIO, Socket as ClientSocket } from 'socket.io-client';
 import { authMiddleware } from '../src/auth';
@@ -9,7 +10,9 @@ import { registerHandlers as registerEncoderHandlers } from '../src/handlers/enc
 
 // Use a fixed secret so tests are self-contained.
 const TEST_SECRET = 'test-secret-123';
+const TEST_LEGACY_SECRET = 'legacy-test-secret-456';
 process.env.TOKEN_SECRET = TEST_SECRET;
+process.env.LEGACY_HMAC_SECRET = TEST_LEGACY_SECRET;
 process.env.NODE_ENV = 'test';
 
 // ── Test server helpers ──────────────────────────────────────────────────────
@@ -31,6 +34,18 @@ function buildClient(opts: {
       encoders_id: opts.encoders_id ?? 'enc1',
     },
   });
+}
+
+function buildLegacyToken(userId: string, encoderId: string): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const date = `${year}-${month}-${day}`;
+
+  return createHmac('sha256', TEST_LEGACY_SECRET)
+    .update(`${userId}|${encoderId}|${date}`)
+    .digest('hex');
 }
 
 function connected(socket: ClientSocket): Promise<void> {
@@ -86,6 +101,19 @@ afterAll(() => {
 describe('Authentication', () => {
   test('valid token connects successfully', async () => {
     const client = buildClient({ token: TEST_SECRET });
+    await expect(connected(client)).resolves.toBeUndefined();
+    client.disconnect();
+  });
+
+  test('legacy HMAC token connects successfully', async () => {
+    const userId = 'legacy-user';
+    const encoderId = 'legacy-encoder';
+    const client = buildClient({
+      token: buildLegacyToken(userId, encoderId),
+      user_id: userId,
+      encoders_id: encoderId,
+    });
+
     await expect(connected(client)).resolves.toBeUndefined();
     client.disconnect();
   });
