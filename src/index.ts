@@ -66,6 +66,13 @@ export const io = new Server(httpServer, {
     methods: ['GET', 'POST'],
     credentials: true,
   },
+  cookie: {
+    name: 'io',
+    path: '/',
+    httpOnly: true,
+    sameSite: 'none',
+    secure: true,
+  },
   allowEIO3: true,
   pingInterval: SOCKET_PING_INTERVAL,
   pingTimeout: SOCKET_PING_TIMEOUT,
