@@ -47,7 +47,7 @@ services:
       SOCKET_PING_TIMEOUT: "60000"
       SOCKET_UPGRADE_TIMEOUT: "30000"
       TOKEN_SECRET: change-me
-      ALLOWED_ORIGINS: https://mtvosoct1.mediatriple.net,http://localhost
+      ALLOWED_ORIGINS: https://panel.mediatriple.net,https://vopanelpp.mediatriple.net,https://mtvosoct1.mediatriple.net,http://localhost
     labels:
       - traefik.enable=true
       - traefik.http.routers.videoonly-socket.rule=Host(`mtvosoct1.mediatriple.net`)

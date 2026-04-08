@@ -73,7 +73,7 @@ spec:
             - name: TOKEN_SECRET
               value: change-me
             - name: ALLOWED_ORIGINS
-              value: https://mtvosoct1.mediatriple.net,http://localhost
+              value: https://panel.mediatriple.net,https://vopanelpp.mediatriple.net,https://mtvosoct1.mediatriple.net,http://localhost
           command: ["/bin/sh", "-c"]
           args:
             - |

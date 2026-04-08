@@ -6,6 +6,7 @@ import { logger } from './logger';
 import { registerHandlers as registerTextareaHandlers } from './handlers/textarea';
 import { registerHandlers as registerSoundHandlers } from './handlers/sound';
 import { registerHandlers as registerEncoderHandlers } from './handlers/encoder';
+import { resolveAllowedOrigins } from './config';
 
 const PORT = parseInt(process.env.PORT ?? '3030', 10);
 const SOCKET_PING_INTERVAL = parseInt(
@@ -20,11 +21,7 @@ const SOCKET_UPGRADE_TIMEOUT = parseInt(
   process.env.SOCKET_UPGRADE_TIMEOUT ?? '30000',
   10,
 );
-const ALLOWED_ORIGINS = (
-  process.env.ALLOWED_ORIGINS ?? 'https://panel.mediatriple.net,http://localhost'
-)
-  .split(',')
-  .map((o) => o.trim());
+const ALLOWED_ORIGINS = resolveAllowedOrigins();
 
 // ── HTTP server ──────────────────────────────────────────────────────────────
 
