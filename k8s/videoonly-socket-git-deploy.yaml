@@ -13,7 +13,7 @@ stringData:
   SOCKET_UPGRADE_TIMEOUT: "30000"
   TOKEN_SECRET: bimvid-wihHav-5mybse
   LEGACY_HMAC_SECRET: yQZBke4F5NXKVHJYpfcU8A
-  ALLOWED_ORIGINS: https://panel.mediatriple.net,https://vopanelpp.mediatriple.net,https://mtvosoct1.mediatriple.net,http://localhost
+  ALLOWED_ORIGINS: https://panel.mediatriple.net,https://vopanelpp.mediatriple.net,https://mtvosoct1.mediatriple.net,https://panel.videoon.ly,http://localhost
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -43,6 +43,7 @@ spec:
                 secretKeyRef:
                   name: git-token
                   key: token
+                  optional: true
             - name: GIT_REPO
               value: https://github.com/mediatriple/videoonly-socket.git
             - name: GIT_BRANCH
@@ -51,19 +52,38 @@ spec:
           args:
             - |
               set -eu
-              auth_b64="$(printf 'x-access-token:%s' "${GIT_TOKEN}" | base64 | tr -d '\n')"
-              auth_header="Authorization: Basic ${auth_b64}"
+
+              if [ -n "${GIT_TOKEN:-}" ]; then
+                auth_b64="$(printf 'x-access-token:%s' "${GIT_TOKEN}" | base64 | tr -d '\n')"
+                auth_header="Authorization: Basic ${auth_b64}"
+
+                git_clone() {
+                  git -c http.extraheader="${auth_header}" clone --depth 1 --branch "${GIT_BRANCH}" "${GIT_REPO}" /repo
+                }
+
+                git_fetch() {
+                  git -C /repo -c http.extraheader="${auth_header}" fetch origin "${GIT_BRANCH}" --depth 1
+                }
+              else
+                git_clone() {
+                  git clone --depth 1 --branch "${GIT_BRANCH}" "${GIT_REPO}" /repo
+                }
+
+                git_fetch() {
+                  git -C /repo fetch origin "${GIT_BRANCH}" --depth 1
+                }
+              fi
 
               if [ ! -d /repo/.git ]; then
-                git -c http.extraheader="${auth_header}" clone --depth 1 --branch "${GIT_BRANCH}" "${GIT_REPO}" /repo
+                git_clone
               else
                 git -C /repo remote set-url origin "${GIT_REPO}"
-                git -C /repo -c http.extraheader="${auth_header}" fetch origin "${GIT_BRANCH}" --depth 1
+                git_fetch
                 git -C /repo reset --hard "origin/${GIT_BRANCH}"
               fi
 
               while true; do
-                git -C /repo -c http.extraheader="${auth_header}" fetch origin "${GIT_BRANCH}" --depth 1
+                git_fetch
                 git -C /repo reset --hard "origin/${GIT_BRANCH}"
                 sleep 10
               done
@@ -126,17 +146,23 @@ spec:
           ports:
             - name: http
               containerPort: 3030
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 3030
+            failureThreshold: 18
+            periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /health
               port: 3030
-            initialDelaySeconds: 20
+            initialDelaySeconds: 10
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /health
               port: 3030
-            initialDelaySeconds: 30
+            initialDelaySeconds: 10
             periodSeconds: 10
           volumeMounts:
             - name: repo
@@ -165,19 +191,13 @@ metadata:
     acme.cert-manager.io/http01-edit-in-place: "true"
     cert-manager.io/cluster-issuer: letsencrypt-prod
     kubernetes.io/ingress.class: nginx
-    nginx.ingress.kubernetes.io/affinity: "cookie"
-    nginx.ingress.kubernetes.io/affinity-mode: "persistent"
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$arg_encoders_id"
     nginx.ingress.kubernetes.io/enable-cors: "true"
-    nginx.ingress.kubernetes.io/cors-allow-origin: "https://panel.mediatriple.net,https://vopanelpp.mediatriple.net,https://mtvosoct1.mediatriple.net"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://panel.mediatriple.net,https://vopanelpp.mediatriple.net,https://mtvosoct1.mediatriple.net,https://panel.videoon.ly"
     nginx.ingress.kubernetes.io/cors-allow-methods: "GET,POST,OPTIONS"
     nginx.ingress.kubernetes.io/cors-allow-headers: "Origin,Accept,Content-Type,Authorization,Cache-Control,X-Requested-With,Range"
     nginx.ingress.kubernetes.io/cors-expose-headers: "Content-Length,Content-Range"
     nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
-    nginx.ingress.kubernetes.io/session-cookie-name: "route"
-    nginx.ingress.kubernetes.io/session-cookie-max-age: "86400"
-    nginx.ingress.kubernetes.io/session-cookie-expires: "86400"
-    nginx.ingress.kubernetes.io/session-cookie-samesite: "None"
-    nginx.ingress.kubernetes.io/session-cookie-secure: "true"
     nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
@@ -189,9 +209,27 @@ spec:
   tls:
     - hosts:
         - mtvosoct1.mediatriple.net
+        - panel.videoon.ly
       secretName: videoonly-socket-mtvosoct1-tls
   rules:
     - host: mtvosoct1.mediatriple.net
+      http:
+        paths:
+          - path: /socket.io
+            pathType: Prefix
+            backend:
+              service:
+                name: videoonly-socket
+                port:
+                  number: 3030
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: videoonly-socket
+                port:
+                  number: 3030
+    - host: panel.videoon.ly
       http:
         paths:
           - path: /socket.io
