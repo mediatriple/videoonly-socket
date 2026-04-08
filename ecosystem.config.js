@@ -20,10 +20,24 @@ module.exports = {
       env: {
         NODE_ENV: 'development',
         PORT: 3030,
+        LOG_LEVEL: process.env.LOG_LEVEL || 'info',
+        ALLOWED_ORIGINS:
+          process.env.ALLOWED_ORIGINS ||
+          'https://panel.mediatriple.net,https://vopanelpp.mediatriple.net,https://mtvosoct1.mediatriple.net,http://localhost',
+        SOCKET_PING_INTERVAL: process.env.SOCKET_PING_INTERVAL || '25000',
+        SOCKET_PING_TIMEOUT: process.env.SOCKET_PING_TIMEOUT || '60000',
+        SOCKET_UPGRADE_TIMEOUT: process.env.SOCKET_UPGRADE_TIMEOUT || '30000',
       },
       env_production: {
         NODE_ENV: 'production',
         PORT: 3030,
+        LOG_LEVEL: process.env.LOG_LEVEL || 'info',
+        ALLOWED_ORIGINS:
+          process.env.ALLOWED_ORIGINS ||
+          'https://panel.mediatriple.net,https://vopanelpp.mediatriple.net,https://mtvosoct1.mediatriple.net,http://localhost',
+        SOCKET_PING_INTERVAL: process.env.SOCKET_PING_INTERVAL || '25000',
+        SOCKET_PING_TIMEOUT: process.env.SOCKET_PING_TIMEOUT || '60000',
+        SOCKET_UPGRADE_TIMEOUT: process.env.SOCKET_UPGRADE_TIMEOUT || '30000',
         // TOKEN_SECRET and ALLOWED_ORIGINS should be injected via the host
         // environment or a secrets manager — never hard-code them here.
       },
