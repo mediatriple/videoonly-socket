@@ -1,3 +1,19 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: videoonly-socket-env
+  namespace: videoonly
+type: Opaque
+stringData:
+  PORT: "3030"
+  NODE_ENV: development
+  LOG_LEVEL: info
+  SOCKET_PING_INTERVAL: "25000"
+  SOCKET_PING_TIMEOUT: "60000"
+  SOCKET_UPGRADE_TIMEOUT: "30000"
+  TOKEN_SECRET: change-me
+  ALLOWED_ORIGINS: https://panel.mediatriple.net,https://vopanelpp.mediatriple.net,https://mtvosoct1.mediatriple.net,http://localhost
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -57,23 +73,9 @@ spec:
         - name: app
           image: node:20-alpine
           imagePullPolicy: IfNotPresent
-          env:
-            - name: PORT
-              value: "3030"
-            - name: NODE_ENV
-              value: development
-            - name: LOG_LEVEL
-              value: info
-            - name: SOCKET_PING_INTERVAL
-              value: "25000"
-            - name: SOCKET_PING_TIMEOUT
-              value: "60000"
-            - name: SOCKET_UPGRADE_TIMEOUT
-              value: "30000"
-            - name: TOKEN_SECRET
-              value: change-me
-            - name: ALLOWED_ORIGINS
-              value: https://panel.mediatriple.net,https://vopanelpp.mediatriple.net,https://mtvosoct1.mediatriple.net,http://localhost
+          envFrom:
+            - secretRef:
+                name: videoonly-socket-env
           command: ["/bin/sh", "-c"]
           args:
             - |
